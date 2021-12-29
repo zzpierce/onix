@@ -1,2 +1,2 @@
 # onix
-aim to execute golang code
+onix aim to generate executable from golang code
