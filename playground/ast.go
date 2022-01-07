@@ -16,7 +16,7 @@ func readFile(fileName string) (string, error) {
 }
 
 func main() {
-	src, _ := readFile("../data/hello.go")
+	src, _ := readFile("../data/simple.txt")
 
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "", src, 0)
