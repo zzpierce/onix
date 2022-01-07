@@ -19,13 +19,13 @@ type Scanner struct {
 const (
 	StateError = iota
 	StateSpace
-	StateLit
-	StateStr
-	StateChar
-	StateOpr
 	StateNumber
+	StateChar
+	StateStr
+	StateLit
+	StateOpr
 	StateBrace
-	StateDot
+	StateDotLike
 )
 
 func isSpace(c rune) bool {
@@ -38,7 +38,8 @@ func isDecimal(c rune) bool {
 
 func isOpr(c rune) bool {
 	return c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '&' ||
-		c == '|' || c == '~' || c == '^' || c == ':' || c == '=' || c == '>' || c == '<'
+		c == '|' || c == '~' || c == '^' || c == ':' || c == '=' || c == '>' ||
+		c == '<' || c == '!'
 }
 
 func isBrace(c rune) bool {
@@ -58,8 +59,63 @@ func isLit(c rune) bool {
 	return false
 }
 
-func isDot(c rune) bool {
-	return c == '.'
+func isDotLike(c rune) bool {
+	return c == '.' || c == ','
+}
+
+const (
+	AfterSpace = 1 << iota
+	AfterNumber
+	AfterChar
+	AfterStr
+	AfterLit
+	AfterOpr
+	AfterBrace
+	AfterDotLike
+)
+
+func (s *Scanner) afterAction(next rune, after int) bool {
+	if (after&AfterSpace == AfterSpace) && isSpace(next) {
+		s.out()
+		s.nextstate(StateSpace)
+		return true
+	}
+	if (after&AfterNumber == AfterNumber) && isDecimal(next) {
+		s.outthen(next)
+		s.nextstate(StateNumber)
+		return true
+	}
+	if (after&AfterChar == AfterChar) && next == '\'' {
+		s.outthen(next)
+		s.nextstate(StateChar)
+		return true
+	}
+	if (after&AfterStr == AfterStr) && next == '"' {
+		s.outthen(next)
+		s.nextstate(StateStr)
+		return true
+	}
+	if (after&AfterLit == AfterLit) && isLit(next) {
+		s.outthen(next)
+		s.nextstate(StateLit)
+		return true
+	}
+	if (after&AfterOpr == AfterOpr) && isOpr(next) {
+		s.outthen(next)
+		s.nextstate(StateOpr)
+		return true
+	}
+	if (after&AfterBrace == AfterBrace) && isBrace(next) {
+		s.outthen(next)
+		s.nextstate(StateBrace)
+		return true
+	}
+	if (after&AfterDotLike == AfterDotLike) && isDotLike(next) {
+		s.outthen(next)
+		s.nextstate(StateDotLike)
+		return true
+	}
+	return false
 }
 
 func (s *Scanner) actionSpace() error {
@@ -67,91 +123,10 @@ func (s *Scanner) actionSpace() error {
 	if isSpace(e) {
 		return nil
 	}
-	s.cur = append(s.cur, e)
-	if isDecimal(e) {
-		s.nextstate(StateNumber)
-		return nil
-	}
-	if isOpr(e) {
-		s.nextstate(StateOpr)
-		return nil
-	}
-	if isBrace(e) {
-		s.nextstate(StateBrace)
-		return nil
-	}
-	if e == '"' {
-		s.nextstate(StateStr)
-		return nil
-	}
-	if e == '\'' {
-		s.nextstate(StateChar)
-		return nil
-	}
-	if isLit(e) {
-		s.nextstate(StateLit)
+	if s.afterAction(e, AfterNumber|AfterChar|AfterStr|AfterLit|AfterOpr|AfterBrace|AfterDotLike) {
 		return nil
 	}
 	return fmt.Errorf("ActionSpace meet unknown rune: %v", string(e))
-}
-
-func (s *Scanner) actionBrace() error {
-	s.out()
-	s.nextstate(StateSpace)
-	return nil
-}
-
-func (s *Scanner) actionLit() error {
-	e := s.next()
-	if isSpace(e) {
-		s.out()
-		s.nextstate(StateSpace)
-		return nil
-	}
-	if isOpr(e) {
-		s.outthen(e)
-		s.nextstate(StateOpr)
-		return nil
-	}
-	if isBrace(e) {
-		s.outthen(e)
-		s.nextstate(StateBrace)
-		return nil
-	}
-	if isDot(e) {
-		s.outthen(e)
-		s.nextstate(StateDot)
-		return nil
-	}
-	if isLit(e) || isDecimal(e) {
-		s.cur = append(s.cur, e)
-		return nil
-	}
-	return fmt.Errorf("ActionLit meet unknown rune: %v", e)
-}
-
-func (s *Scanner) actionOpr() error {
-	e := s.next()
-	if isSpace(e) {
-		s.out()
-		s.nextstate(StateSpace)
-		return nil
-	}
-	if isBrace(e) {
-		s.outthen(e)
-		s.nextstate(StateBrace)
-		return nil
-	}
-	if isLit(e) {
-		s.outthen(e)
-		s.nextstate(StateLit)
-		return nil
-	}
-	if isOpr(e) {
-		s.cur = append(s.cur, e)
-		return nil
-	}
-	return fmt.Errorf("ActionOpr meet unknown rune: %v", string(e))
 }
 
 func (s *Scanner) actionStr() error {
@@ -167,23 +142,8 @@ func (s *Scanner) actionStr() error {
 
 func (s *Scanner) actionDigit() error {
 	e := s.next()
-	if isSpace(e) {
-		s.out()
-		s.nextstate(StateSpace)
-		return nil
-	}
 	if isDecimal(e) {
 		s.cur = append(s.cur, e)
-		return nil
-	}
-	if isBrace(e) {
-		s.outthen(e)
-		s.nextstate(StateBrace)
-		return nil
-	}
-	if isOpr(e) {
-		s.outthen(e)
-		s.nextstate(StateOpr)
 		return nil
 	}
 	if e == '.' {
@@ -194,9 +154,41 @@ func (s *Scanner) actionDigit() error {
 			return fmt.Errorf("ActionDigit multiple dots in one digit")
 		}
 	}
+	if s.afterAction(e, AfterSpace|AfterOpr|AfterBrace) {
+		return nil
+	}
 	return fmt.Errorf("ActionDigit unknown rune: %v", e)
 }
 
+func (s *Scanner) actionLit() error {
+	e := s.next()
+	if isLit(e) || isDecimal(e) {
+		s.cur = append(s.cur, e)
+		return nil
+	}
+	if s.afterAction(e, AfterSpace|AfterOpr|AfterBrace|AfterDotLike) {
+		return nil
+	}
+	return fmt.Errorf("ActionLit meet unknown rune: %v", e)
+}
+
+func (s *Scanner) actionOpr() error {
+	e := s.next()
+	if isOpr(e) {
+		s.cur = append(s.cur, e)
+		return nil
+	}
+	if s.afterAction(e, AfterSpace|AfterChar|AfterStr|AfterLit|AfterBrace) {
+		return nil
+	}
+	return fmt.Errorf("ActionOpr meet unknown rune: %v", string(e))
+}
+
+func (s *Scanner) actionBrace() error {
+	s.out()
+	s.nextstate(StateSpace)
+	return nil
+}
 func (s *Scanner) actionDot() error {
 	s.out()
 	s.nextstate(StateSpace)
@@ -218,7 +210,7 @@ func (s *Scanner) step() error {
 		err = s.actionStr()
 	case StateNumber:
 		err = s.actionDigit()
-	case StateDot:
+	case StateDotLike:
 		err = s.actionDot()
 	default:
 		return fmt.Errorf("step state error :%v", s.state)
@@ -244,6 +236,9 @@ func (s *Scanner) Literal() (string, error) {
 	}()
 	for s.poo == "" {
 		if s.ScanFin() {
+			if s.poo == "" && len(s.cur) > 0 {
+				s.out()
+			}
 			break
 		}
 		err := s.step()
