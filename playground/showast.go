@@ -15,8 +15,8 @@ func readFile(fileName string) (string, error) {
 	return string(content), nil
 }
 
-func main() {
-	src, _ := readFile("../data/simple.txt")
+func showast() {
+	src, _ := readFile("../playground2/main.go")
 
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, "", src, 0)
@@ -24,4 +24,8 @@ func main() {
 		panic(err)
 	}
 	ast.Print(fset, f)
+}
+
+func main() {
+	showast()
 }

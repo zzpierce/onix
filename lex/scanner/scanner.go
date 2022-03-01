@@ -1,4 +1,4 @@
-package lex
+package scanner
 
 import (
 	"fmt"
@@ -28,25 +28,25 @@ const (
 	StateDotLike
 )
 
-func isSpace(c rune) bool {
+func IsSpace(c rune) bool {
 	return c == ' ' || c == '\t' || c == '\n' || c == '\r'
 }
 
-func isDecimal(c rune) bool {
+func IsDecimal(c rune) bool {
 	return c >= '0' && c <= '9'
 }
 
-func isOpr(c rune) bool {
+func IsOpr(c rune) bool {
 	return c == '+' || c == '-' || c == '*' || c == '/' || c == '%' || c == '&' ||
 		c == '|' || c == '~' || c == '^' || c == ':' || c == '=' || c == '>' ||
 		c == '<' || c == '!'
 }
 
-func isBrace(c rune) bool {
+func IsBrace(c rune) bool {
 	return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}'
 }
 
-func isLit(c rune) bool {
+func IsLit(c rune) bool {
 	if c >= 'a' && c <= 'z' {
 		return true
 	}
@@ -75,12 +75,12 @@ const (
 )
 
 func (s *Scanner) afterAction(next rune, after int) bool {
-	if (after&AfterSpace == AfterSpace) && isSpace(next) {
+	if (after&AfterSpace == AfterSpace) && IsSpace(next) {
 		s.out()
 		s.nextstate(StateSpace)
 		return true
 	}
-	if (after&AfterNumber == AfterNumber) && isDecimal(next) {
+	if (after&AfterNumber == AfterNumber) && IsDecimal(next) {
 		s.outthen(next)
 		s.nextstate(StateNumber)
 		return true
@@ -95,17 +95,17 @@ func (s *Scanner) afterAction(next rune, after int) bool {
 		s.nextstate(StateStr)
 		return true
 	}
-	if (after&AfterLit == AfterLit) && isLit(next) {
+	if (after&AfterLit == AfterLit) && IsLit(next) {
 		s.outthen(next)
 		s.nextstate(StateLit)
 		return true
 	}
-	if (after&AfterOpr == AfterOpr) && isOpr(next) {
+	if (after&AfterOpr == AfterOpr) && IsOpr(next) {
 		s.outthen(next)
 		s.nextstate(StateOpr)
 		return true
 	}
-	if (after&AfterBrace == AfterBrace) && isBrace(next) {
+	if (after&AfterBrace == AfterBrace) && IsBrace(next) {
 		s.outthen(next)
 		s.nextstate(StateBrace)
 		return true
@@ -120,7 +120,7 @@ func (s *Scanner) afterAction(next rune, after int) bool {
 
 func (s *Scanner) actionSpace() error {
 	e := s.next()
-	if isSpace(e) {
+	if IsSpace(e) {
 		return nil
 	}
 	if s.afterAction(e, AfterNumber|AfterChar|AfterStr|AfterLit|AfterOpr|AfterBrace|AfterDotLike) {
@@ -142,7 +142,7 @@ func (s *Scanner) actionStr() error {
 
 func (s *Scanner) actionDigit() error {
 	e := s.next()
-	if isDecimal(e) {
+	if IsDecimal(e) {
 		s.cur = append(s.cur, e)
 		return nil
 	}
@@ -162,7 +162,7 @@ func (s *Scanner) actionDigit() error {
 
 func (s *Scanner) actionLit() error {
 	e := s.next()
-	if isLit(e) || isDecimal(e) {
+	if IsLit(e) || IsDecimal(e) {
 		s.cur = append(s.cur, e)
 		return nil
 	}
@@ -174,7 +174,7 @@ func (s *Scanner) actionLit() error {
 
 func (s *Scanner) actionOpr() error {
 	e := s.next()
-	if isOpr(e) {
+	if IsOpr(e) {
 		s.cur = append(s.cur, e)
 		return nil
 	}
@@ -218,7 +218,7 @@ func (s *Scanner) step() error {
 	return err
 }
 
-func InitScan(path string) (*Scanner, error) {
+func NewScanner(path string) (*Scanner, error) {
 	by, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err

@@ -10,6 +10,7 @@ func main() {
 	fmt.Println("hello world" + strconv.FormatFloat(math.Abs(100), 'f', -1, 64))
 }
 
-func abc(a int, b int) int {
+func add(a, b int) (c int) {
+	c += 1
 	return a + b
 }
